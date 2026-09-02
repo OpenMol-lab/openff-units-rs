@@ -39,7 +39,7 @@ impl UnitRegistry {
             &["degK", "°K", "degree_Kelvin", "degreeK", "Kelvin"],
         );
         registry.define_base("radian", "rad", 1.0, Dimension::NONE, &["rad"]);
-        registry.define_base("bit", "bit", 1.0, Dimension::with(8), &[]);
+        registry.define_base("bit", "bit", 1.0, Dimension::NONE, &[]);
         registry.define_base("count", "count", 1.0, Dimension::NONE, &[]);
         registry.define(
             "dimensionless",
@@ -338,6 +338,9 @@ impl UnitRegistry {
         if let Some(value) = self.units.get(&key) {
             return Ok(value.clone());
         }
+        if let Some(value) = self.prefixed(name.trim()) {
+            return Ok(value);
+        }
         if let Some(value) = self.prefixed(&key) {
             return Ok(value);
         }
@@ -359,7 +362,9 @@ impl UnitRegistry {
 
     fn prefixed(&self, key: &str) -> Option<Unit> {
         const PREFIXES: &[(&str, f64)] = &[
+            // Long names (case insensitive after normalization).
             ("deka", 1e1),
+            ("deca", 1e1),
             ("deci", 1e-1),
             ("centi", 1e-2),
             ("milli", 1e-3),
@@ -378,8 +383,26 @@ impl UnitRegistry {
             ("exa", 1e18),
             ("zetta", 1e21),
             ("yotta", 1e24),
+            ("hecto", 1e2),
+            ("kibi", 1_024.0),
+            ("mebi", 1_048_576.0),
+            ("gibi", 1_073_741_824.0),
+            ("tebi", 1_099_511_627_776.0),
+            ("pebi", 1_125_899_906_842_624.0),
+            ("exbi", 1_152_921_504_606_846_976.0),
+            ("zebi", 1_180_591_620_717_411_303_424.0),
+            ("yobi", 1_208_925_819_614_629_174_706_176.0),
             // Common SI symbols are accepted in addition to long prefixes.
             ("da", 1e1),
+            ("h", 1e2),
+            ("Ki", 1_024.0),
+            ("Mi", 1_048_576.0),
+            ("Gi", 1_073_741_824.0),
+            ("Ti", 1_099_511_627_776.0),
+            ("Pi", 1_125_899_906_842_624.0),
+            ("Ei", 1_152_921_504_606_846_976.0),
+            ("Zi", 1_180_591_620_717_411_303_424.0),
+            ("Yi", 1_208_925_819_614_629_174_706_176.0),
             ("d", 1e-1),
             ("c", 1e-2),
             ("m", 1e-3),
@@ -399,8 +422,16 @@ impl UnitRegistry {
             ("Z", 1e21),
             ("Y", 1e24),
         ];
+        let normalized = normalize(key);
         for (prefix, factor) in PREFIXES {
-            if let Some(base_name) = key.strip_prefix(prefix)
+            let candidate = if key.starts_with(prefix) {
+                key.strip_prefix(prefix)
+            } else if prefix.len() > 1 {
+                normalized.strip_prefix(&normalize(prefix))
+            } else {
+                None
+            };
+            if let Some(base_name) = candidate
                 && let Some(base) = self.units.get(base_name)
                 && base.offset == 0.0
             {
@@ -548,11 +579,18 @@ impl Parser<'_> {
                 break;
             }
             let divide = match self.tokens[self.position] {
-                Token::Mul => false,
-                Token::Div => true,
+                Token::Mul => {
+                    self.position += 1;
+                    false
+                }
+                Token::Div => {
+                    self.position += 1;
+                    true
+                }
+                // Pint accepts whitespace as multiplication (e.g. `kg m/s²`).
+                Token::Name(_) | Token::Number(_) | Token::LParen => false,
                 _ => break,
             };
-            self.position += 1;
             let rhs = self.parse_power()?;
             value = if divide {
                 value.div(&rhs)?

@@ -10,6 +10,10 @@ fn chemical_aliases_and_nmr_dimensions() {
     assert_eq!(one_ohm, Quantity::new(1.0, "henry / second").unwrap());
     assert_eq!(one_ohm, Quantity::new(1.0, "volt / ampere").unwrap());
     assert_eq!(
+        one_ohm,
+        (1.0 / Quantity::new(1.0, "siemens").unwrap()).unwrap()
+    );
+    assert_eq!(
         Quantity::new(1.0, "watt").unwrap(),
         Quantity::new(1.0, "joule / second").unwrap()
     );
@@ -22,6 +26,11 @@ fn arrays_and_serde_round_trip() {
     let json = serde_json::to_string(&q).unwrap();
     let decoded: Quantity = serde_json::from_str(&json).unwrap();
     assert_eq!(q, decoded);
+    let from_text: Quantity = serde_json::from_str("\"1.0 angstrom\"").unwrap();
+    assert_eq!(from_text, Quantity::new(1.0, "angstrom").unwrap());
+    let from_object: Quantity =
+        serde_json::from_str(r#"{"magnitude": 1.0, "units": "angstrom"}"#).unwrap();
+    assert_eq!(from_object, Quantity::new(1.0, "angstrom").unwrap());
 }
 
 #[test]
@@ -34,6 +43,16 @@ fn constants_and_openmm_round_trip() {
     let q = Quantity::new(4.0, "nanometer").unwrap();
     let omm = openmm::to_openmm(Some(&q)).unwrap();
     assert_eq!(openmm::from_openmm(Some(&omm)).unwrap(), q);
+    let dalton_omm = openmm::OpenMMQuantity::new(0.5, "dalton").unwrap();
+    assert_eq!(
+        openmm::from_openmm(Some(&dalton_omm)).unwrap(),
+        Quantity::new(0.5, "gram / mole").unwrap()
+    );
+    let molar_mass = Quantity::new(0.5, "gram / mole").unwrap();
+    assert_eq!(
+        openmm::to_openmm(Some(&molar_mass)).unwrap().unit(),
+        &unit().get("dalton").unwrap()
+    );
     assert_eq!(
         openmm::openmm_unit_to_string(Some(&unit().get("kilojoule_per_mole").unwrap())).unwrap(),
         "mole**-1 * kilojoule"
@@ -53,6 +72,18 @@ fn constants_and_openmm_round_trip() {
             expression
         );
     }
+    let dalton = unit().get("dalton").unwrap();
+    assert_eq!(
+        openmm::openmm_unit_to_string(Some(&dalton)).unwrap(),
+        "g/mol"
+    );
+    assert_eq!(openmm::string_to_openmm_unit("g/mol").unwrap(), dalton);
+    assert!(
+        openmm::to_openmm(None)
+            .unwrap_err()
+            .to_string()
+            .contains("OpenFF")
+    );
 }
 
 #[test]
@@ -67,6 +98,7 @@ fn elements_match_python_tables() {
 fn prefixes_offsets_and_measurements() {
     let q = Quantity::new(1.0, "meter").unwrap();
     assert!((q.to("cm").unwrap().value().unwrap() - 100.0).abs() < 1e-10);
+    assert_eq!(q.to_base_units().unwrap().u().name(), "meter");
     let mut in_place = Quantity::new(1.0, "meter").unwrap();
     in_place.ito("centimeter").unwrap();
     assert_eq!(in_place.value().unwrap(), 100.0);
@@ -78,10 +110,45 @@ fn prefixes_offsets_and_measurements() {
         .unwrap();
     assert_eq!(measurement.value().value().unwrap(), 1.0);
     assert_eq!(measurement.error().value().unwrap(), 0.05);
+    assert!(
+        Quantity::new(1.0, "kelvin")
+            .unwrap()
+            .plus_minus("0.05 meter")
+            .is_err()
+    );
     assert_eq!(
         Quantity::from_str("1/meter").unwrap().u().dimension().0[0],
         -1
     );
     let reciprocal = 1.0 / unit().get("meter").unwrap();
     assert_eq!(reciprocal.unwrap().u().dimension().0[0], -1);
+    assert_eq!(
+        Quantity::new(1.0, "kg m / s**2").unwrap(),
+        Quantity::new(1.0, "newton").unwrap()
+    );
+    assert!((unit().get("MPa").unwrap().scale() - 1.0e6).abs() < 1e-6);
+    assert!((unit().get("KiB").unwrap().scale() - 8192.0).abs() < 1e-6);
+    assert!((unit().get("hectometer").unwrap().scale() - 100.0).abs() < 1e-12);
+    assert!((unit().get("decameter").unwrap().scale() - 10.0).abs() < 1e-12);
+    assert!(unit().get("yobimeter").is_ok());
+}
+
+#[test]
+fn ensure_quantity_accepts_scalars_and_arrays() {
+    use openff_units::openmm::{EnsuredQuantity, ensure_quantity};
+
+    assert!(matches!(
+        ensure_quantity(1, "openff").unwrap(),
+        EnsuredQuantity::OpenFF(_)
+    ));
+    assert!(matches!(
+        ensure_quantity(vec![1, 2], "openmm").unwrap(),
+        EnsuredQuantity::OpenMM(_)
+    ));
+    let array = ndarray::Array2::from_elem((2, 2), 3.0).into_dyn();
+    assert!(matches!(
+        ensure_quantity(array, "openff").unwrap(),
+        EnsuredQuantity::OpenFF(_)
+    ));
+    assert!(ensure_quantity(1.0, "pint").is_err());
 }

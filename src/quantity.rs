@@ -1,6 +1,6 @@
 use crate::{Result, Unit, UnitError, UnitInput};
 use ndarray::{ArrayD, IxDyn};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt;
 use std::ops::{Add, Div, Mul, Neg, Sub};
 use std::str::FromStr;
@@ -38,6 +38,36 @@ impl From<usize> for Magnitude {
         Self::Scalar(value as f64)
     }
 }
+impl From<u8> for Magnitude {
+    fn from(value: u8) -> Self {
+        Self::Scalar(f64::from(value))
+    }
+}
+impl From<u16> for Magnitude {
+    fn from(value: u16) -> Self {
+        Self::Scalar(f64::from(value))
+    }
+}
+impl From<u32> for Magnitude {
+    fn from(value: u32) -> Self {
+        Self::Scalar(value as f64)
+    }
+}
+impl From<u64> for Magnitude {
+    fn from(value: u64) -> Self {
+        Self::Scalar(value as f64)
+    }
+}
+impl From<i8> for Magnitude {
+    fn from(value: i8) -> Self {
+        Self::Scalar(f64::from(value))
+    }
+}
+impl From<i16> for Magnitude {
+    fn from(value: i16) -> Self {
+        Self::Scalar(f64::from(value))
+    }
+}
 impl From<Vec<f64>> for Magnitude {
     fn from(value: Vec<f64>) -> Self {
         Self::Array(
@@ -48,6 +78,16 @@ impl From<Vec<f64>> for Magnitude {
 impl From<Vec<i32>> for Magnitude {
     fn from(value: Vec<i32>) -> Self {
         Self::from(value.into_iter().map(f64::from).collect::<Vec<_>>())
+    }
+}
+impl From<Vec<u32>> for Magnitude {
+    fn from(value: Vec<u32>) -> Self {
+        Self::from(
+            value
+                .into_iter()
+                .map(|item| item as f64)
+                .collect::<Vec<_>>(),
+        )
     }
 }
 impl From<ArrayD<f64>> for Magnitude {
@@ -80,11 +120,36 @@ impl Magnitude {
 }
 
 /// A numerical magnitude associated with a unit.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Quantity {
     pub magnitude: Magnitude,
     #[serde(rename = "units")]
     pub unit: Unit,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum QuantityRepr {
+    Object {
+        magnitude: Magnitude,
+        #[serde(rename = "units")]
+        units: Unit,
+    },
+    Text(String),
+}
+
+impl<'de> Deserialize<'de> for Quantity {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        match QuantityRepr::deserialize(deserializer)? {
+            QuantityRepr::Object { magnitude, units } => {
+                Self::new(magnitude, units).map_err(serde::de::Error::custom)
+            }
+            QuantityRepr::Text(value) => Self::from_str(&value).map_err(serde::de::Error::custom),
+        }
+    }
 }
 
 impl PartialEq for Quantity {
@@ -212,10 +277,7 @@ impl Quantity {
                 }
             }
         };
-        Ok(Measurement {
-            value: self.clone(),
-            uncertainty,
-        })
+        Measurement::new(self.clone(), uncertainty)
     }
 }
 
@@ -336,6 +398,49 @@ impl Div<Unit> for f64 {
     fn div(self, rhs: Unit) -> Self::Output {
         Quantity::new(self, crate::registry::unit().get("dimensionless")?)?
             .div(Quantity::new(1.0, rhs)?)
+    }
+}
+
+impl Div<Quantity> for f64 {
+    type Output = Result<Quantity>;
+
+    fn div(self, rhs: Quantity) -> Self::Output {
+        Quantity::dimensionless(self).div(rhs)
+    }
+}
+
+impl Mul<Unit> for i32 {
+    type Output = Result<Quantity>;
+
+    fn mul(self, rhs: Unit) -> Self::Output {
+        Quantity::new(self, rhs)
+    }
+}
+
+impl Div<Unit> for i32 {
+    type Output = Result<Quantity>;
+
+    fn div(self, rhs: Unit) -> Self::Output {
+        Quantity::dimensionless(self).div(Quantity::new(1.0, rhs)?)
+    }
+}
+
+impl Mul<Quantity> for i32 {
+    type Output = Result<Quantity>;
+
+    fn mul(self, rhs: Quantity) -> Self::Output {
+        Ok(Quantity {
+            magnitude: rhs.magnitude.map(|value| f64::from(self) * value),
+            unit: rhs.unit,
+        })
+    }
+}
+
+impl Div<Quantity> for i32 {
+    type Output = Result<Quantity>;
+
+    fn div(self, rhs: Quantity) -> Self::Output {
+        Quantity::dimensionless(self).div(rhs)
     }
 }
 

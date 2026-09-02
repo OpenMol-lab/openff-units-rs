@@ -13,6 +13,8 @@ use thiserror::Error;
 pub enum OpenMMError {
     #[error("Input is None, expected an (OpenMM) Quantity object.")]
     NoneQuantityError,
+    #[error("Input is None, expected an (OpenFF) Quantity object.")]
+    NoneOpenFFQuantityError,
     #[error("Input is None, expected an (OpenMM) Unit object.")]
     NoneUnitError,
     #[error("OpenMM unit `{0}` is unavailable")]
@@ -28,10 +30,21 @@ pub type MissingOpenMMUnitError = OpenMMError;
 
 pub type OpenMMResult<T> = std::result::Result<T, OpenMMError>;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct OpenMMQuantity {
     pub magnitude: Magnitude,
     pub unit: Unit,
+}
+
+impl PartialEq for OpenMMQuantity {
+    fn eq(&self, other: &Self) -> bool {
+        Quantity::new(self.magnitude.clone(), self.unit.clone())
+            .and_then(|left| {
+                Quantity::new(other.magnitude.clone(), other.unit.clone())
+                    .map(|right| left == right)
+            })
+            .unwrap_or(false)
+    }
 }
 
 impl OpenMMQuantity {
@@ -56,14 +69,33 @@ impl OpenMMQuantity {
 
 pub fn from_openmm(input: Option<&OpenMMQuantity>) -> OpenMMResult<Quantity> {
     let input = input.ok_or(OpenMMError::NoneQuantityError)?;
+    // OpenMM serializes daltons as `g/mol`; expose the same canonical unit on
+    // the OpenFF side for interoperability with molar-mass quantities.
+    if input.unit.name() == "dalton" {
+        return Ok(Quantity::new(input.magnitude.clone(), "gram / mole")?);
+    }
     Ok(Quantity::new(input.magnitude.clone(), input.unit.clone())?)
 }
 
 pub fn to_openmm(input: Option<&Quantity>) -> OpenMMResult<OpenMMQuantity> {
-    let input = input.ok_or(OpenMMError::NoneQuantityError)?;
+    let input = input.ok_or(OpenMMError::NoneOpenFFQuantityError)?;
     // OpenMM and OpenFF share the ordinary SI units. Custom constants and
     // dimensions are converted to their SI representation at the boundary.
     let unit_name = input.unit.name();
+    let dimensions = input.unit.dimension().0;
+    if dimensions[2] == 1
+        && dimensions[5] == -1
+        && dimensions.iter().enumerate().all(|(index, value)| {
+            (index == 2 && *value == 1) || (index == 5 && *value == -1) || *value == 0
+        })
+        && (input.unit.scale() - 1.0e-3).abs() < 1.0e-15
+    {
+        let dalton = crate::registry::unit().get("dalton")?;
+        return Ok(OpenMMQuantity {
+            magnitude: input.magnitude.clone(),
+            unit: dalton,
+        });
+    }
     let known = [
         "dimensionless",
         "meter",
@@ -118,6 +150,9 @@ pub fn openmm_unit_to_string(input: Option<&Unit>) -> OpenMMResult<String> {
     if name == "dimensionless" {
         return Ok("dimensionless".to_owned());
     }
+    if name == "dalton" {
+        return Ok("g/mol".to_owned());
+    }
     match name {
         "kilojoule_per_mole" => Ok("mole**-1 * kilojoule".to_owned()),
         "kilocalorie_per_mole" => Ok("mole**-1 * kilocalorie".to_owned()),
@@ -140,11 +175,14 @@ pub fn openmm_unit_to_string(input: Option<&Unit>) -> OpenMMResult<String> {
         _ if name.contains("second ** -1") && name.contains("picosecond") => {
             Ok("picosecond**-1".to_owned())
         }
-        _ => Ok(name.to_owned()),
+        _ => Ok(name.replace(" ** ", "**")),
     }
 }
 
 pub fn string_to_openmm_unit(expression: &str) -> OpenMMResult<Unit> {
+    if expression == "g/mol" {
+        return Ok(crate::registry::unit().get("dalton")?);
+    }
     let expression = if expression == "standard_atmosphere" {
         "atmosphere"
     } else {
@@ -174,6 +212,66 @@ impl From<OpenMMQuantity> for EnsureInput {
 impl From<f64> for EnsureInput {
     fn from(value: f64) -> Self {
         Self::Scalar(value)
+    }
+}
+impl From<i32> for EnsureInput {
+    fn from(value: i32) -> Self {
+        Self::Scalar(f64::from(value))
+    }
+}
+impl From<i64> for EnsureInput {
+    fn from(value: i64) -> Self {
+        Self::Scalar(value as f64)
+    }
+}
+impl From<usize> for EnsureInput {
+    fn from(value: usize) -> Self {
+        Self::Scalar(value as f64)
+    }
+}
+impl From<u8> for EnsureInput {
+    fn from(value: u8) -> Self {
+        Self::Scalar(f64::from(value))
+    }
+}
+impl From<u16> for EnsureInput {
+    fn from(value: u16) -> Self {
+        Self::Scalar(f64::from(value))
+    }
+}
+impl From<u32> for EnsureInput {
+    fn from(value: u32) -> Self {
+        Self::Scalar(value as f64)
+    }
+}
+impl From<u64> for EnsureInput {
+    fn from(value: u64) -> Self {
+        Self::Scalar(value as f64)
+    }
+}
+impl From<i8> for EnsureInput {
+    fn from(value: i8) -> Self {
+        Self::Scalar(f64::from(value))
+    }
+}
+impl From<i16> for EnsureInput {
+    fn from(value: i16) -> Self {
+        Self::Scalar(f64::from(value))
+    }
+}
+impl From<Vec<i32>> for EnsureInput {
+    fn from(value: Vec<i32>) -> Self {
+        Self::Array(ndarray::Array1::from_iter(value.into_iter().map(f64::from)).into_dyn())
+    }
+}
+impl From<ndarray::ArrayD<f64>> for EnsureInput {
+    fn from(value: ndarray::ArrayD<f64>) -> Self {
+        Self::Array(value)
+    }
+}
+impl From<ndarray::ArrayD<i32>> for EnsureInput {
+    fn from(value: ndarray::ArrayD<i32>) -> Self {
+        Self::Array(value.mapv(f64::from))
     }
 }
 impl From<Vec<f64>> for EnsureInput {

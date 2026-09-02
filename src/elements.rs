@@ -197,9 +197,9 @@ pub static NUMBERS: LazyLock<BTreeMap<&'static str, u8>> = LazyLock::new(|| {
 /// A complete entry in the element table.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Element {
-    atomic_number: u8,
-    symbol: &'static str,
-    mass: f64,
+    pub atomic_number: u8,
+    pub symbol: &'static str,
+    pub mass: f64,
 }
 
 impl Element {
