@@ -17,6 +17,19 @@ fn chemical_aliases_and_nmr_dimensions() {
         Quantity::new(1.0, "watt").unwrap(),
         Quantity::new(1.0, "joule / second").unwrap()
     );
+    for (name, symbol) in [
+        ("tesla", "T"),
+        ("ohm", "Ω"),
+        ("henry", "H"),
+        ("siemens", "S"),
+        ("watt", "W"),
+        ("weber", "Wb"),
+    ] {
+        assert_eq!(
+            Quantity::new(2.5, name).unwrap(),
+            Quantity::new(2.5, symbol).unwrap()
+        );
+    }
 }
 
 #[test]
@@ -31,6 +44,10 @@ fn arrays_and_serde_round_trip() {
     let from_object: Quantity =
         serde_json::from_str(r#"{"magnitude": 1.0, "units": "angstrom"}"#).unwrap();
     assert_eq!(from_object, Quantity::new(1.0, "angstrom").unwrap());
+    let matrix = Quantity::new(ndarray::Array2::eye(3).into_dyn(), "angstrom").unwrap();
+    let matrix_json = serde_json::to_string(&matrix).unwrap();
+    let matrix_decoded: Quantity = serde_json::from_str(&matrix_json).unwrap();
+    assert_eq!(matrix, matrix_decoded);
 }
 
 #[test]
