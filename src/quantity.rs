@@ -177,6 +177,12 @@ impl Quantity {
         })
     }
 
+    /// Convert this quantity in place, equivalent to Pint's ``ito`` method.
+    pub fn ito<U: Into<UnitInput>>(&mut self, target: U) -> Result<()> {
+        *self = self.to(target)?;
+        Ok(())
+    }
+
     pub fn to_base_units(&self) -> Result<Self> {
         let target = crate::registry::unit().base_unit(self.unit.dimension())?;
         self.to(target)
@@ -321,6 +327,15 @@ impl Div<f64> for Quantity {
             magnitude: self.magnitude.map(|value| value / rhs),
             unit: self.unit,
         })
+    }
+}
+
+impl Div<Unit> for f64 {
+    type Output = Result<Quantity>;
+
+    fn div(self, rhs: Unit) -> Self::Output {
+        Quantity::new(self, crate::registry::unit().get("dimensionless")?)?
+            .div(Quantity::new(1.0, rhs)?)
     }
 }
 

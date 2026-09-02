@@ -67,6 +67,9 @@ fn elements_match_python_tables() {
 fn prefixes_offsets_and_measurements() {
     let q = Quantity::new(1.0, "meter").unwrap();
     assert!((q.to("cm").unwrap().value().unwrap() - 100.0).abs() < 1e-10);
+    let mut in_place = Quantity::new(1.0, "meter").unwrap();
+    in_place.ito("centimeter").unwrap();
+    assert_eq!(in_place.value().unwrap(), 100.0);
     let celsius = Quantity::new(0.0, "degC").unwrap();
     assert!((celsius.to("kelvin").unwrap().value().unwrap() - 273.15).abs() < 1e-12);
     let measurement = Quantity::new(1.0, "kelvin")
@@ -79,4 +82,6 @@ fn prefixes_offsets_and_measurements() {
         Quantity::from_str("1/meter").unwrap().u().dimension().0[0],
         -1
     );
+    let reciprocal = 1.0 / unit().get("meter").unwrap();
+    assert_eq!(reciprocal.unwrap().u().dimension().0[0], -1);
 }

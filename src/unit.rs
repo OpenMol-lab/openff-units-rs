@@ -2,6 +2,7 @@ use crate::{Result, UnitError};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 use std::ops::{Div, Mul};
+use std::str::FromStr;
 
 /// Exponents of the SI base dimensions plus OpenFF's two auxiliary dimensions.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -163,6 +164,14 @@ impl PartialEq for Unit {
 impl fmt::Display for Unit {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.name)
+    }
+}
+
+impl FromStr for Unit {
+    type Err = UnitError;
+
+    fn from_str(value: &str) -> Result<Self> {
+        Self::parse(value)
     }
 }
 

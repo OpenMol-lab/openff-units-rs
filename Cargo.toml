@@ -2,6 +2,10 @@
 name = "openff-units"
 version = "0.1.0"
 edition = "2024"
+description = "OpenFF-compatible units, quantities, measurements, and chemical element data"
+license = "MIT"
+repository = "https://github.com/openforcefield/openff-units"
+readme = "README.md"
 
 [dependencies]
 ndarray = { version = "0.16", features = ["serde"] }

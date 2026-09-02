@@ -344,6 +344,10 @@ impl UnitRegistry {
         Err(UnitError::UnknownUnit(name.to_owned()))
     }
 
+    pub fn contains(&self, name: &str) -> bool {
+        self.get(name).is_ok()
+    }
+
     /// Construct a quantity using this registry.
     pub fn quantity<M, U>(&self, magnitude: M, unit: U) -> Result<crate::Quantity>
     where
