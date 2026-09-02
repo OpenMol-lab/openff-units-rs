@@ -28,6 +28,9 @@ fn arrays_and_serde_round_trip() {
 fn constants_and_openmm_round_trip() {
     let kb = Quantity::new(1.0, "k_B").unwrap();
     assert!(kb.to("kilogram * meter**2 / second**2 / kelvin").is_ok());
+    let kb_openmm = openmm::to_openmm(Some(&kb)).unwrap();
+    assert_eq!(kb_openmm.unit().dimension(), kb.u().dimension());
+    assert!((kb_openmm.value().as_scalar().unwrap() - 1.380649e-23).abs() < 1e-35);
     let q = Quantity::new(4.0, "nanometer").unwrap();
     let omm = openmm::to_openmm(Some(&q)).unwrap();
     assert_eq!(openmm::from_openmm(Some(&omm)).unwrap(), q);
@@ -35,6 +38,21 @@ fn constants_and_openmm_round_trip() {
         openmm::openmm_unit_to_string(Some(&unit().get("kilojoule_per_mole").unwrap())).unwrap(),
         "mole**-1 * kilojoule"
     );
+    for expression in [
+        "mole**-1 * kilojoule",
+        "angstrom**-2 * mole**-1 * kilocalorie",
+        "nanometer**-2 * mole**-1 * joule",
+        "picosecond**-1",
+        "dimensionless",
+        "second",
+        "angstrom",
+    ] {
+        let parsed = openmm::string_to_openmm_unit(expression).unwrap();
+        assert_eq!(
+            openmm::openmm_unit_to_string(Some(&parsed)).unwrap(),
+            expression
+        );
+    }
 }
 
 #[test]

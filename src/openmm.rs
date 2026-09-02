@@ -117,6 +117,12 @@ pub fn openmm_unit_to_string(input: Option<&Unit>) -> OpenMMResult<String> {
     match name {
         "kilojoule_per_mole" => Ok("mole**-1 * kilojoule".to_owned()),
         "kilocalorie_per_mole" => Ok("mole**-1 * kilocalorie".to_owned()),
+        _ if name.contains("angstrom ** -2 * mole ** -1 * kilocalorie") => {
+            Ok("angstrom**-2 * mole**-1 * kilocalorie".to_owned())
+        }
+        _ if name.contains("nanometer ** -2 * mole ** -1 * joule") => {
+            Ok("nanometer**-2 * mole**-1 * joule".to_owned())
+        }
         _ if name.contains("kilocalorie / mole / angstrom") => {
             Ok("angstrom**-2 * mole**-1 * kilocalorie".to_owned())
         }
