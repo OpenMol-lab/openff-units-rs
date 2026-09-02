@@ -105,6 +105,9 @@ impl Unit {
     }
 
     pub fn powi(&self, exponent: i32) -> Result<Self> {
+        if exponent == 1 {
+            return Ok(self.clone());
+        }
         if self.offset != 0.0 && exponent != 1 {
             return Err(UnitError::OffsetUnit);
         }
@@ -121,6 +124,12 @@ impl Unit {
         if self.offset != 0.0 || other.offset != 0.0 {
             return Err(UnitError::OffsetUnit);
         }
+        if self.dimension == Dimension::NONE && self.scale == 1.0 {
+            return Ok(other.clone());
+        }
+        if other.dimension == Dimension::NONE && other.scale == 1.0 {
+            return Ok(self.clone());
+        }
         Ok(Self::with_symbol(
             format!("{} * {}", self.name, other.name),
             format!("{} * {}", self.symbol, other.symbol),
@@ -133,6 +142,9 @@ impl Unit {
     pub fn div(&self, other: &Unit) -> Result<Self> {
         if self.offset != 0.0 || other.offset != 0.0 {
             return Err(UnitError::OffsetUnit);
+        }
+        if other.dimension == Dimension::NONE && other.scale == 1.0 {
+            return Ok(self.clone());
         }
         Ok(Self::with_symbol(
             format!("{} / {}", self.name, other.name),
