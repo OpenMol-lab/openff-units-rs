@@ -21,6 +21,11 @@ pub enum OpenMMError {
     Unit(#[from] UnitError),
 }
 
+/// Compatibility aliases for the exception names in the Python module.
+pub type NoneQuantityError = OpenMMError;
+pub type NoneUnitError = OpenMMError;
+pub type MissingOpenMMUnitError = OpenMMError;
+
 pub type OpenMMResult<T> = std::result::Result<T, OpenMMError>;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -56,10 +61,50 @@ pub fn from_openmm(input: Option<&OpenMMQuantity>) -> OpenMMResult<Quantity> {
 
 pub fn to_openmm(input: Option<&Quantity>) -> OpenMMResult<OpenMMQuantity> {
     let input = input.ok_or(OpenMMError::NoneQuantityError)?;
-    Ok(OpenMMQuantity {
-        magnitude: input.magnitude.clone(),
-        unit: input.unit.clone(),
-    })
+    // OpenMM and OpenFF share the ordinary SI units. Custom constants and
+    // dimensions are converted to their SI representation at the boundary.
+    let unit_name = input.unit.name();
+    let known = [
+        "dimensionless",
+        "meter",
+        "nanometer",
+        "angstrom",
+        "picosecond",
+        "second",
+        "kelvin",
+        "mole",
+        "kilogram",
+        "gram",
+        "ampere",
+        "dalton",
+        "joule",
+        "kilojoule",
+        "kilocalorie",
+        "erg",
+        "newton",
+        "pascal",
+        "coulomb",
+        "volt",
+        "watt",
+        "ohm",
+        "siemens",
+        "henry",
+        "weber",
+        "tesla",
+        "bar",
+    ];
+    if known.contains(&unit_name) {
+        Ok(OpenMMQuantity {
+            magnitude: input.magnitude.clone(),
+            unit: input.unit.clone(),
+        })
+    } else {
+        let base = input.to_base_units()?;
+        Ok(OpenMMQuantity {
+            magnitude: base.magnitude,
+            unit: base.unit,
+        })
+    }
 }
 
 /// Return the OpenMM-style product of base units used by a unit expression.
@@ -77,6 +122,11 @@ pub fn openmm_unit_to_string(input: Option<&Unit>) -> OpenMMResult<String> {
         }
         _ if name.contains("joule / mole / nanometer") => {
             Ok("nanometer**-2 * mole**-1 * joule".to_owned())
+        }
+        _ if name.contains("mole ** -1 * kilojoule") => Ok("mole**-1 * kilojoule".to_owned()),
+        _ if name.contains("mole ** -1 * kilocalorie") => Ok("mole**-1 * kilocalorie".to_owned()),
+        _ if name.contains("second ** -1") && name.contains("picosecond") => {
+            Ok("picosecond**-1".to_owned())
         }
         _ => Ok(name.to_owned()),
     }

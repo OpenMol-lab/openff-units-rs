@@ -344,6 +344,15 @@ impl UnitRegistry {
         Err(UnitError::UnknownUnit(name.to_owned()))
     }
 
+    /// Construct a quantity using this registry.
+    pub fn quantity<M, U>(&self, magnitude: M, unit: U) -> Result<crate::Quantity>
+    where
+        M: Into<crate::Magnitude>,
+        U: Into<crate::UnitInput>,
+    {
+        crate::Quantity::new(magnitude, unit)
+    }
+
     fn prefixed(&self, key: &str) -> Option<Unit> {
         const PREFIXES: &[(&str, f64)] = &[
             ("deka", 1e1),

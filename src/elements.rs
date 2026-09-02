@@ -171,6 +171,20 @@ pub static MASSES_F64: LazyLock<BTreeMap<u8, f64>> = LazyLock::new(|| {
         .collect()
 });
 
+/// Unit-aware atomic masses, matching Python's ``MASSES`` mapping.
+pub static MASSES: LazyLock<BTreeMap<u8, crate::Quantity>> = LazyLock::new(|| {
+    MASS_DATA
+        .iter()
+        .enumerate()
+        .map(|(index, mass)| {
+            (
+                (index + 1) as u8,
+                crate::Quantity::new(*mass, "dalton").expect("dalton is registered"),
+            )
+        })
+        .collect()
+});
+
 /// Mapping from element symbol to atomic number.
 pub static NUMBERS: LazyLock<BTreeMap<&'static str, u8>> = LazyLock::new(|| {
     SYMBOL_DATA

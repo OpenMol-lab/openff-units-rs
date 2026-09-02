@@ -120,13 +120,27 @@ impl Quantity {
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(value: &str) -> Result<Self> {
         let value = value.trim();
-        let split = value.find(char::is_whitespace).ok_or_else(|| {
+        let split = value.find(char::is_whitespace).or_else(|| {
+            value.char_indices().find_map(|(index, character)| {
+                (index > 0 && matches!(character, '*' | '/')).then_some(index)
+            })
+        });
+        let split = split.ok_or_else(|| {
             UnitError::Parse("quantity must contain a magnitude and unit".to_owned())
         })?;
         let magnitude = value[..split]
+            .trim()
+            .trim_end_matches('*')
             .parse::<f64>()
             .map_err(|_| UnitError::Magnitude(value[..split].to_owned()))?;
-        let expression = value[split..].trim().trim_start_matches('*').trim();
+        let mut expression = value[split..]
+            .trim()
+            .trim_start_matches('*')
+            .trim()
+            .to_owned();
+        if expression.starts_with('/') {
+            expression = format!("dimensionless {expression}");
+        }
         Self::new(magnitude, expression)
     }
 
@@ -177,10 +191,20 @@ impl Quantity {
             .unwrap_or(false)
     }
 
+    pub fn to_openmm(&self) -> crate::openmm::OpenMMResult<crate::openmm::OpenMMQuantity> {
+        crate::openmm::to_openmm(Some(self))
+    }
+
     pub fn plus_minus<U: Into<UnitInput>>(&self, uncertainty: U) -> Result<Measurement> {
         let uncertainty = match uncertainty.into() {
             UnitInput::Unit(unit) => Self::new(1.0, unit)?,
-            UnitInput::Expression(value) => Self::from_str(&value)?,
+            UnitInput::Expression(value) => {
+                if let Ok(value) = value.trim().parse::<f64>() {
+                    Self::new(value, self.unit.clone())?
+                } else {
+                    Self::from_str(&value)?
+                }
+            }
         };
         Ok(Measurement {
             value: self.clone(),
@@ -267,6 +291,36 @@ impl Mul<f64> for Unit {
     type Output = Result<Quantity>;
     fn mul(self, rhs: f64) -> Self::Output {
         Quantity::new(rhs, self)
+    }
+}
+
+impl Mul<Quantity> for f64 {
+    type Output = Result<Quantity>;
+    fn mul(self, rhs: Quantity) -> Self::Output {
+        Ok(Quantity {
+            magnitude: rhs.magnitude.map(|value| self * value),
+            unit: rhs.unit,
+        })
+    }
+}
+
+impl Mul<f64> for Quantity {
+    type Output = Result<Quantity>;
+    fn mul(self, rhs: f64) -> Self::Output {
+        Ok(Quantity {
+            magnitude: self.magnitude.map(|value| value * rhs),
+            unit: self.unit,
+        })
+    }
+}
+
+impl Div<f64> for Quantity {
+    type Output = Result<Quantity>;
+    fn div(self, rhs: f64) -> Self::Output {
+        Ok(Quantity {
+            magnitude: self.magnitude.map(|value| value / rhs),
+            unit: self.unit,
+        })
     }
 }
 

@@ -1,6 +1,7 @@
 use crate::{Result, UnitError};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
+use std::ops::{Div, Mul};
 
 /// Exponents of the SI base dimensions plus OpenFF's two auxiliary dimensions.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -94,6 +95,14 @@ impl Unit {
         self.dimension == other.dimension
     }
 
+    /// Attach a scalar magnitude to this unit.
+    pub fn quantity(
+        &self,
+        magnitude: impl Into<crate::Magnitude>,
+    ) -> crate::Result<crate::Quantity> {
+        crate::Quantity::new(magnitude, self.clone())
+    }
+
     pub fn powi(&self, exponent: i32) -> Result<Self> {
         if self.offset != 0.0 && exponent != 1 {
             return Err(UnitError::OffsetUnit);
@@ -157,6 +166,20 @@ impl fmt::Display for Unit {
     }
 }
 
+impl Mul for Unit {
+    type Output = Result<Self>;
+    fn mul(self, rhs: Self) -> Self::Output {
+        Unit::mul(&self, &rhs)
+    }
+}
+
+impl Div for Unit {
+    type Output = Result<Self>;
+    fn div(self, rhs: Self) -> Self::Output {
+        Unit::div(&self, &rhs)
+    }
+}
+
 impl Serialize for Unit {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
@@ -204,5 +227,11 @@ impl From<&str> for UnitInput {
 impl From<String> for UnitInput {
     fn from(value: String) -> Self {
         Self::Expression(value)
+    }
+}
+
+impl From<f64> for UnitInput {
+    fn from(value: f64) -> Self {
+        Self::Expression(value.to_string())
     }
 }
