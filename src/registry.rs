@@ -133,7 +133,7 @@ impl UnitRegistry {
             Dimension::NONE,
             &["arcdeg", "arcdegree", "angular_degree"],
         );
-        registry.define("byte", "B", 8.0, Dimension::with(8), &["octet"]);
+        registry.define("byte", "B", 8.0, Dimension::NONE, &["octet"]);
         registry.define_expr("angstrom", "Å", "1e-10 * meter", &["ångström", "Å"]);
         registry.define_expr("micron", "µ", "micrometer", &[]);
         registry.define_expr("micrometer", "µm", "1e-6 * meter", &["um"]);

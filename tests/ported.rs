@@ -148,6 +148,11 @@ fn prefixes_offsets_and_measurements() {
     assert!((unit().get("hectometer").unwrap().scale() - 100.0).abs() < 1e-12);
     assert!((unit().get("decameter").unwrap().scale() - 10.0).abs() < 1e-12);
     assert!(unit().get("yobimeter").is_ok());
+    assert!(
+        Quantity::new(1.0, "byte")
+            .unwrap()
+            .is_compatible_with("dimensionless")
+    );
 }
 
 #[test]
