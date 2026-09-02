@@ -92,6 +92,10 @@ pub fn to_openmm(input: Option<&Quantity>) -> OpenMMResult<OpenMMQuantity> {
         "weber",
         "tesla",
         "bar",
+        "kilocalorie_per_mole",
+        "kilojoule_per_mole",
+        "calorie_per_mole",
+        "joule_per_mole",
     ];
     if known.contains(&unit_name) {
         Ok(OpenMMQuantity {
@@ -117,6 +121,8 @@ pub fn openmm_unit_to_string(input: Option<&Unit>) -> OpenMMResult<String> {
     match name {
         "kilojoule_per_mole" => Ok("mole**-1 * kilojoule".to_owned()),
         "kilocalorie_per_mole" => Ok("mole**-1 * kilocalorie".to_owned()),
+        _ if name == "kilocalorie / mole" => Ok("mole**-1 * kilocalorie".to_owned()),
+        _ if name == "kilojoule / mole" => Ok("mole**-1 * kilojoule".to_owned()),
         _ if name.contains("angstrom ** -2 * mole ** -1 * kilocalorie") => {
             Ok("angstrom**-2 * mole**-1 * kilocalorie".to_owned())
         }
