@@ -36,7 +36,7 @@ impl UnitRegistry {
             "K",
             1.0,
             Dimension::with(4),
-            &["degK", "degree_Kelvin", "degreeK", "Kelvin"],
+            &["degK", "°K", "degree_Kelvin", "degreeK", "Kelvin"],
         );
         registry.define_base("radian", "rad", 1.0, Dimension::NONE, &["rad"]);
         registry.define_base("bit", "bit", 1.0, Dimension::with(8), &[]);
