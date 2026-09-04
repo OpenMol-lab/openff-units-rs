@@ -19,3 +19,13 @@ let force_constant = unit().quantity(2000.0, "kilocalories_per_mole / angstrom**
 The bundled `data/defaults.txt` and `data/constants.txt` are retained in their
 Pint-compatible form and are available through the `openff_units::data` module.
 See the API documentation for the complete registry and conversion surface.
+
+## Upstream Source
+
+This Rust implementation is ported from the upstream OpenFF Units project:
+
+- Repository: <https://github.com/openforcefield/openff-units>
+- Latest migrated upstream commit: [`3700032ad88ecb84166231e86ae3594aa15641e2`](https://github.com/openforcefield/openff-units/commit/3700032ad88ecb84166231e86ae3594aa15641e2)
+
+The commit ID above identifies the latest `main` revision used as the migration
+reference.
